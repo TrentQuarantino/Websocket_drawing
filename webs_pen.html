@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Websocket pen</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            color: white;
+        }
+        .container {
+            height: 100%;
+            display: flex;
+        }
+    </style>
+</head>
+
+<body>
+    <section class="container">
+        <div class="drawing-board">
+            <canvas id="drawing-board"></canvas>
+        </div>
+    </section>
+    <script>
+        const canvas = document.getElementById('drawing-board');
+        const ctx = canvas.getContext('2d');
+
+        const canvasOffsetX = canvas.offsetLeft;
+        const canvasOffsetY = canvas.offsetTop;
+
+        canvas.width = window.innerWidth - canvasOffsetX;
+        canvas.height = window.innerHeight - canvasOffsetY;
+
+        let isPainting = false;
+        let startX;
+        let startY;
+
+        const socket = new WebSocket('ws://localhost:8000');
+        socket.addEventListener('open', function (evh) {
+            socket.send('Connection Established');
+        });
+
+        socket.addEventListener('message', function (evh) {
+            dati = JSON.parse(evh.data);
+            console.log(dati);
+            if (dati.name == 'start') {
+                let dato = { x: dati.x, y: dati.y };
+                console.log('***dato***', dato)
+                setMoveTo(dato);
+            } else if (dati.name == 'move') {
+                let datum = { x: dati.x, y: dati.y }
+                newDraw(datum)
+            }
+        });
+
+        const draw = (evh) => {
+            if (!isPainting) {
+                return;
+            }
+
+            ctx.lineTo(evh.clientX - canvasOffsetX, evh.clientY);
+            ctx.stroke();
+
+            let data = {
+                name: 'move',
+                x: evh.clientX - canvasOffsetX,
+                y: evh.clientY
+            };
+            socket.send(JSON.stringify(data));
+        }
+
+        canvas.addEventListener('mousedown', (evh) => {
+            isPainting = true;
+            startX = evh.clientX;
+            startY = evh.clientY;
+
+            let dato = {
+                name: 'start',
+                x: evh.clientX,
+                y: evh.clientY
+            };
+            socket.send(JSON.stringify(dato));
+
+        });
+
+        canvas.addEventListener('mouseup', (evh) => {
+            isPainting = false;
+            ctx.stroke();
+            ctx.beginPath();
+        });
+
+        canvas.addEventListener('mousemove', draw);
+
+        const setMoveTo = (dato) => {
+            ctx.beginPath();
+            ctx.moveTo = (dato.x, dato.y);
+        }
+
+        const newDraw = (dati) => {
+            ctx.lineTo(dati.x, dati.y);
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>
